@@ -29,6 +29,7 @@
         }
         html {
             scroll-behavior: smooth;
+            overflow-x: hidden;
         }
         body {
             font-family: 'Manrope', sans-serif;
@@ -428,14 +429,14 @@
             pointer-events: auto;
         }
         .mobile-menu-panel {
-            width: min(100%, 34rem);
-            padding: 2rem;
-            border-radius: 2rem;
-            background: rgba(255,255,255,0.08);
-            border: 1px solid rgba(255,255,255,0.14);
-            box-shadow: 0 30px 70px -28px rgba(10, 28, 18, 0.55);
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
+            width: min(100%, 38rem);
+            padding: 1.25rem 0.25rem;
+            border-radius: 0;
+            background: transparent;
+            border: 0;
+            box-shadow: none;
+            backdrop-filter: none;
+            -webkit-backdrop-filter: none;
         }
         .mobile-menu-link {
             display: flex;
@@ -480,28 +481,69 @@
             height: 35px;
             fill: white;
         }
+        body.menu-open .whatsapp-fab {
+            opacity: 0 !important;
+            visibility: hidden !important;
+            pointer-events: none !important;
+        }
         @media (max-width: 768px) {
+            body {
+                overflow-x: clip;
+            }
             .review-card {
                 width: 320px;
             }
             .hero-content {
                 grid-template-columns: 1fr;
-                padding: 1.25rem;
+                padding: 1rem 1.25rem;
+                width: 100%;
+                overflow: hidden;
             }
             .hero-copy {
-                padding: 0.5rem;
+                min-width: 0;
+                padding: 0;
+                border-left: 0;
+            }
+            .hero-copy > * + * {
+                margin-top: 1.15rem !important;
+            }
+            #inicio .display-title {
+                font-size: 2.58rem;
+                line-height: 0.98;
+                max-width: 100%;
+            }
+            #inicio p {
+                font-size: 1rem;
+                line-height: 1.6;
             }
             .hero-visual {
-                height: 18rem;
+                display: none;
             }
             .hero-arrow {
-                width: 2.65rem;
-                height: 2.65rem;
-                right: 1rem;
-                bottom: 1rem;
+                display: none;
             }
-            .hero-arrow.prev {
-                right: 4.35rem;
+            .hero-dots {
+                position: static !important;
+                margin: 1rem 0 0 0;
+                padding: 0 1.25rem 1.2rem;
+                transform: none;
+            }
+            #missao .relative.min-h-\[320px\] {
+                min-height: 26rem;
+            }
+            #missao .relative.min-h-\[320px\] .absolute.inset-0.p-10 {
+                padding: 1.5rem;
+                justify-content: center;
+                text-align: center;
+            }
+            #missao .relative.min-h-\[320px\] h3 {
+                font-size: 2.05rem;
+                line-height: 1.08;
+                letter-spacing: -0.03em;
+            }
+            #missao .relative.min-h-\[320px\] a {
+                align-self: center;
+                margin-top: 1.5rem;
             }
         }
     </style>
@@ -951,10 +993,15 @@
             const menuLinks = document.querySelectorAll("[data-menu-link='true']");
             const heroSlides = Array.from(document.querySelectorAll("[data-hero-slide]"));
             const heroDots = Array.from(document.querySelectorAll("[data-hero-dot]"));
+            const heroCarousel = document.querySelector("#hero-carousel");
             const heroPrev = document.querySelector("#hero-prev");
             const heroNext = document.querySelector("#hero-next");
             const faqItems = Array.from(document.querySelectorAll("[data-faq-item]"));
             let heroIndex = 0;
+            let heroTimer;
+            let swipeStartX = 0;
+            let swipeStartY = 0;
+            let swipeTracking = false;
 
             const syncNavState = () => {
                 nav?.classList.toggle("is-scrolled", window.scrollY > 12);
@@ -997,18 +1044,65 @@
                 heroIndex = nextIndex;
             };
 
+            const startHeroAutoplay = () => {
+                clearInterval(heroTimer);
+                if (heroSlides.length < 2) return;
+                heroTimer = setInterval(() => {
+                    setHeroSlide((heroIndex + 1) % heroSlides.length);
+                }, 5000);
+            };
+
+            const handleSwipeStart = (clientX, clientY, target) => {
+                if (target?.closest?.("a, button")) return;
+                swipeStartX = clientX;
+                swipeStartY = clientY;
+                swipeTracking = true;
+            };
+
+            const handleSwipeEnd = (clientX, clientY) => {
+                if (!swipeTracking || heroSlides.length < 2) return;
+                const deltaX = clientX - swipeStartX;
+                const deltaY = clientY - swipeStartY;
+                swipeTracking = false;
+                if (Math.abs(deltaX) < 45 || Math.abs(deltaX) < Math.abs(deltaY) * 1.25) return;
+                setHeroSlide(deltaX < 0 ? (heroIndex + 1) % heroSlides.length : (heroIndex - 1 + heroSlides.length) % heroSlides.length);
+                startHeroAutoplay();
+            };
+
             if (heroSlides.length) {
                 heroPrev?.addEventListener("click", () => {
                     setHeroSlide((heroIndex - 1 + heroSlides.length) % heroSlides.length);
+                    startHeroAutoplay();
                 });
                 heroNext?.addEventListener("click", () => {
                     setHeroSlide((heroIndex + 1) % heroSlides.length);
+                    startHeroAutoplay();
                 });
                 heroDots.forEach((dot, index) => {
                     dot.addEventListener("click", () => {
                         setHeroSlide(index);
+                        startHeroAutoplay();
                     });
                 });
+                heroCarousel?.addEventListener("touchstart", (event) => {
+                    const touch = event.touches[0];
+                    if (touch) handleSwipeStart(touch.clientX, touch.clientY, event.target);
+                }, { passive: true });
+                heroCarousel?.addEventListener("touchend", (event) => {
+                    const touch = event.changedTouches[0];
+                    if (touch) handleSwipeEnd(touch.clientX, touch.clientY);
+                }, { passive: true });
+                heroCarousel?.addEventListener("pointerdown", (event) => {
+                    if (event.pointerType === "touch" || event.pointerType === "pen") {
+                        handleSwipeStart(event.clientX, event.clientY, event.target);
+                    }
+                });
+                heroCarousel?.addEventListener("pointerup", (event) => {
+                    if (event.pointerType === "touch" || event.pointerType === "pen") {
+                        handleSwipeEnd(event.clientX, event.clientY);
+                    }
+                });
+                startHeroAutoplay();
             }
 
             faqItems.forEach(item => {
